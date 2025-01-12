@@ -1,0 +1,35 @@
+eperiment: attention
+
+data: 
+  batch_size: 32
+  num_workers: 4  
+  augmentation: 
+    resize: [224, 224]
+    normaliszation:
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+    horizontal_flip: true
+    rotation: 15
+
+training:
+  epochs: 20
+  learning_rate: 1e-5
+  finetune: true
+  save_model: true
+  plot_metric: false
+  early_stopping: true
+  patience: 5
+
+model:
+  type: attention
+  parameter: 
+    reduction_ratio: 16
+    kernel_size: 7
+    in_channels: [128, 64, 8]
+    dropout_rate: 0.5
+  
+evaluation: 
+  metrics: [accuracy, f1_score, precision, recall]
+  save_results: true
+
+
