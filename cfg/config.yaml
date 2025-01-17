@@ -1,8 +1,11 @@
 eperiment: attention
 
 data: 
+  csv_file: "A1_2024_data/train_data_2024.csv"
+  img_dir: "A1_2024_data/Images"
   batch_size: 32
-  num_workers: 4  
+  num_workers: 4 
+  num_classes: 40 
   augmentation: 
     resize: [224, 224]
     normaliszation:
@@ -19,10 +22,12 @@ training:
   plot_metric: false
   early_stopping: true
   patience: 5
+  classification_weight: 1.0
+  binary_weight: 0.5
 
 model:
-  type: attention
-  parameter: 
+  type: baseline # [baseline, attention]
+  params: 
     reduction_ratio: 16
     kernel_size: 7
     in_channels: [128, 64, 8]

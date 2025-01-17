@@ -1,0 +1,1 @@
+Leave this folder blank, when training the system will save the history in this folder
