@@ -6,16 +6,9 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix
 
 class TestEvaluator:
-    def __init__(self, model, data_loader, device, class_names, log_dir="results\predictions"):
+    def __init__(self, model, data_loader, device, class_names, log_dir="results/predictions"):
         """
         Initialize the TestEvaluator class.
-
-        Args:
-            model (torch.nn.Module): Trained model to evaluate.
-            test_loader (DataLoader): DataLoader for the test dataset.
-            device (torch.device): Device to run the evaluation on (e.g., CPU or GPU).
-            class_names (list): List of class names for classification results.
-            log_dir (str): Directory to save prediction heatmap images.
         """
         self.model = model
         self.data_loader = data_loader
@@ -64,10 +57,6 @@ class TestEvaluator:
     def plot_combined_heatmap(self, results, picture_name="combined_heatmap.png"):
         """
         Plot and save a combined heatmap for classification and binary results.
-
-        Args:
-            results (dict): Results from the evaluate function.
-            picture_name (str): Name of the heatmap image file.
         """
         # Classification Confusion Matrix
         class_cm = confusion_matrix(results["class_labels"], results["class_preds"])

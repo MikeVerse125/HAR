@@ -6,25 +6,21 @@ import csv
 import os
 
 class TrainingPlotter:
-    def __init__(self, log_file="logs/training.csv"):
+    def __init__(self, log_file, model_name="model"):
         """
         Initialize the plotter with the log file containing training history.
         Args:
             log_file (str): Path to the CSV log file.
         """
         self.log_file = log_file
+        self.model_name = model_name
 
-    def plot_and_save_metrics(self, metrics, heads, save_path="results\metrics"):
+    def plot_and_save_metrics(self, metrics, heads, save_path="results/metrics"):
         """
         Plot and save line charts for each metric and task head combination.
-
-        Args:
-            metrics (list): List of metric names (e.g., ["f1_score", "loss", "recall"]).
-            heads (list): List of task heads (e.g., ["classification", "binary"]).
-            save_path (str): Directory to save the plots.
         """
         # Load training history
-        history = self.load_training_history()
+        history = self.__load_training_history()
 
         # Ensure save_path directory exists
         os.makedirs(save_path, exist_ok=True)
@@ -52,18 +48,15 @@ class TrainingPlotter:
                 plt.grid(True)
 
                 # Save the plot
-                file_name = f"{head.lower()}_{metric.lower()}.png"
+                file_name = f"{self.model_name}_{head.lower()}_{metric.lower()}.png"
                 full_path = os.path.join(save_path, file_name)
                 plt.savefig(full_path, bbox_inches="tight")
                 plt.close()  # Close the plot to free memory
                 print(f"Plot saved: {full_path}")
 
-    def load_training_history(self):
+    def __load_training_history(self):
         """
         Load training history from the log file.
-
-        Returns:
-            dict: A dictionary of metrics with keys as column names and values as lists of values over epochs.
         """
         history = {}
         with open(self.log_file, "r") as file:

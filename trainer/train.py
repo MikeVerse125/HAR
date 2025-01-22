@@ -26,9 +26,7 @@ class Trainer:
         self.binary_weight = self.config.get("binary_weight", 1.0)
 
         # Logs
-        self.log = "logs"
-        os.makedirs(self.log, exist_ok=True)
-        self.log_file = os.path.join(self.log, log_file)
+        self.log_file = log_file
 
         # Initialize the history for storing metrics
         self.history = {"epoch": []}
@@ -125,13 +123,13 @@ class Trainer:
 
                 class_labels = labels[:, 0].long()
                 binary_labels = labels[:, 1].float()
-
+                
                 # Forward pass
                 class_logits, binary_logits = self.model(image)
-
+                
                 # Compute the loss
                 classification_loss = self.criterion_classification(class_logits, class_labels)
-                binary_loss = self.criterion_binary(binary_logits, binary_labels)
+                binary_loss = self.criterion_binary(binary_logits, binary_labels.float())
 
                 # Accumulate losses and update metrics
                 total_classification_loss += classification_loss.item()
@@ -168,8 +166,8 @@ class Trainer:
         2. At the end of training if early stopping is not triggered.
         """
         total_epochs = self.config["training"]["epochs"]
-        early_stopping = self.config.get("early_stopping", False)
-        patience = self.config.get("patience", 5)
+        early_stopping = self.config["training"]["early_stopping"]
+        patience = self.config["training"]["patience"]
 
         best_metric = float("inf")  # Assuming we are minimizing validation loss
         patience_counter = 0
@@ -194,7 +192,7 @@ class Trainer:
 
                 # Save the best model
                 if self.config["training"]["save_model"]:
-                    self.__save_model(model_name="best_model.pth")
+                    self.__save_model(model_name=self.model_name)
                     model_saved = True
                     print(f"Best model saved at epoch {epoch + 1}.")
             else:
@@ -237,7 +235,7 @@ class Trainer:
 
         # Save the model at the end of training if it hasn't already been saved
         if not model_saved and self.config["training"]["save_model"]:
-            self.__save_model(model_name="final_model.pth")
+            self.__save_model(model_name="final_" + self.model_name + ".pth")
             print("Final model saved at the end of training.")
 
         print("---------------------Training Complete---------------------")

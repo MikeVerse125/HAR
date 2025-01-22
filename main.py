@@ -36,7 +36,7 @@ def main():
         print(f"Using device: {device}")
 
         # Initialise the model based on the configuration 
-        if config["model"]["type"] == "attenttion":
+        if config["model"]["type"] == "attention":
             # Initialise the attention model in this section
             model = AttentionModel(**config["model"]["params"])
         elif config["model"]["type"] == "baseline":
@@ -59,31 +59,58 @@ def main():
         )
 
         # Initialise the metrics
-        metric = Metrics(num_classes=config["data"]["num_classes"], device=device)    
-        # Train the model
-        print("Start training...")   
-        train_model = Trainer(model=model, dataLoaders=dataset, config=config, device=device, metrics=metric, model_name="baseline.pth") 
-        train_model.fit()
+        metric = Metrics(num_classes=config["data"]["num_classes"], device=device)   
+
+        # Finetune
+        finetune = config["model"]["params"]["finetune"]
+
+        # Log file
+        log_file = "logs/" + (config["model"]["type"] + "_history.csv" if finetune 
+                              else "fine_tune_" + config["model"]["type"] + "_history.csv")
         
+        # Model name
+        model_name = (config["model"]["type"] if finetune 
+                      else "fine_tune_" + config["model"]["type"])
+        
+        # Train the model
+        if config["training"]["status"] == True:
+            print("Start training...")   
+            train_model = Trainer(model=model, 
+                                dataLoaders=dataset, 
+                                config=config, 
+                                device=device, 
+                                metrics=metric, 
+                                model_name=model_name + ".pth",
+                                log_file=log_file) 
+            train_model.fit()
 
         # Plot the history
-        plotter = TrainingPlotter(log_file="logs/training.csv")
-        metrics = ["f1_score", "loss"]
-        heads = ["classification", "binary"]
-        plotter = TrainingPlotter(log_file="logs/training.csv")
-        plotter.plot_and_save_metrics(metrics=metrics, heads=heads, save_path="results/metrics")
+        if config["plotter"]["status"] == True:
+            print("Start plotting...")
+            save_model_path = ("results/ModelsSaved/" + config["model"]["type"]+".pth"if finetune 
+                               else"results/ModelsSaved/" + "fine_tune_" + config["model"]["type"]+".pth")
+            
+            metrics = [metric for metric in config["evaluation"]["metrics"]]
+            heads = [head for head in config["evaluation"]["heads"]]
 
+            model.load_state_dict(torch.load(save_model_path))
+            plotter = TrainingPlotter(log_file=log_file, model_name=model_name)
+            plotter.plot_and_save_metrics(metrics=metrics, heads=heads, save_path="results/metrics")
 
         # Evaluate the model
-        evaluator = TestEvaluator(
-            model=model,                        # Your trained model
-            data_loader=dataset,                # Test DataLoader
-            device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-            class_names=data_loaders.dataset.class_mapping,  # Map class indices to class names
-            log_dir="results/predictions"       # Directory to save heatmap images
-        )
-        results = evaluator.evaluate()
-        evaluator.plot_combined_heatmap(results, picture_name="final_test_heatmap.png")
+        if config["evaluation"]["status"] == True:
+            print("Start Evaluating...")
+            evaluator = TestEvaluator(
+                model=model,                                    # Your trained model
+                data_loader=dataset,                            # Test DataLoader
+                device=device,
+                class_names=data_loaders.dataset.class_mapping, # Map class indices to class names
+                log_dir="results/predictions"                   # Directory to save heatmap images
+            )
+            results = evaluator.evaluate()
+            picture_name = ("final_" + config["model"]["type"] + "_heatmap.png" if finetune 
+                            else "final_" + "fine_tune_" + config["model"]["type"] + "_heatmap.png")
+            evaluator.plot_combined_heatmap(results, picture_name=picture_name)
         
 
     except ValueError as e:

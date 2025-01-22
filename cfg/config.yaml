@@ -3,7 +3,7 @@ eperiment: attention
 data: 
   csv_file: "A1_2024_data/train_data_2024.csv"
   img_dir: "A1_2024_data/Images"
-  batch_size: 32
+  batch_size: 16
   num_workers: 4 
   num_classes: 40 
   augmentation: 
@@ -16,25 +16,33 @@ data:
 
 training:
   epochs: 20
-  learning_rate: 1e-5
-  finetune: true
+  learning_rate: 1e-4    
   save_model: true
-  plot_metric: false
   early_stopping: true
   patience: 5
   classification_weight: 1.0
   binary_weight: 0.5
+  status: true
 
 model:
-  type: baseline # [baseline, attention]
+  type: attention # [baseline, attention]
   params: 
     reduction_ratio: 16
     kernel_size: 7
-    in_channels: [128, 64, 8]
+    finetune: false # If true all layer on the pretrain model unfreeze 
     dropout_rate: 0.5
-  
+    in_channels: [128, 64, 8]
+    
+
 evaluation: 
-  metrics: [accuracy, f1_score, precision, recall]
+  metrics: [loss, f1_score]           # [loss, f1_score, precision, recall]
+  heads: ["classification", "binary"]  # ["classification", "binary"] 
   save_results: true
+  status: true
 
+plotter: 
+  status: true
 
+prediction:
+  num_of_predimg: 9 # Maximum is 9
+  model_path: "results/ModelsSaved/attention.pth"

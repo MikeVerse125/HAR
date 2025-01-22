@@ -16,13 +16,7 @@ class Metrics:
         self.recall_binary = Recall(task="binary").to(device)
 
     def update(self, class_preds, class_labels, binary_preds, binary_labels):
-        """
-        Args:
-            class_preds (Tensor): Predicted class labels.
-            class_labels (Tensor): True class labels.
-            binary_preds (Tensor): Predicted binary labels.
-            binary_labels (Tensor): True binary labels.
-        """
+    
         # Update classification metrics
         self.f1.update(class_preds, class_labels)
         self.precision.update(class_preds, class_labels)
