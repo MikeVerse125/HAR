@@ -1,9 +1,9 @@
-The primary task is to recognize human actions in still images. The model is designed to predict one of 40 possible actions depicted in the image and determine whether there is more than one person present. This implementation begins with training a baseline model and further enhances performance using channel attention mechanisms. Parameters can be customized by modifying the 'config.yaml file'.
+The primary task is to recognize human actions in still images. The model is designed to predict one of 40 possible actions depicted in the image and determine whether there is more than one person present. This implementation begins with training a baseline model and further enhances performance using channel attention mechanisms. Parameters can be customized by modifying the 'config.yaml file'.\n
 
-Run code:
-    python main.py config.yaml
+Run code:\n
+    \t python main.py config.yaml
 
-Run the prediction of the model on unlabel images:
+Run the prediction of the model on unlabel images:\n
     step 1: 
         Update the config file [type, num_of_predimg, model_path]
         Type of the model should match the model_path
