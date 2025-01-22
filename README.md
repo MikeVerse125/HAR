@@ -8,6 +8,7 @@ The primary task is to recognize human actions in still images. The model is des
         Update the config file [type, num_of_predimg, model_path]
         Type of the model should match the model_path
 2.  step 2: 
-        Run code: `python prediction.py config.yaml`
+        Run code:
+        `python prediction.py config.yaml`
 3.  step 3: 
         Check the result in "results/predictions/prediction_result.png"
