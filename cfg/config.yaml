@@ -23,6 +23,14 @@ training:
   classification_weight: 1.0
   binary_weight: 0.5
   status: true
+  track_history: true
+  use_scheduler: true
+  scheduler:
+    type: "ReduceLROnPlateau"  # Options: ReduceLROnPlateau, CosineAnnealingLR, StepLR
+    mode: "min"                # For ReduceLROnPlateau
+    factor: 0.5                # Multiply LR by this when plateauing
+    patience: 3                # Epochs to wait before reducing LR
+    verbose: true              # Print LR changes
 
 model:
   type: attention # [baseline, attention]
@@ -45,4 +53,4 @@ plotter:
 
 prediction:
   num_of_predimg: 9 # Maximum is 9
-  model_path: "results/ModelsSaved/attention.pth"
+  model_path: "results/ModelsSaved/best_fine_tune_attention.pth"

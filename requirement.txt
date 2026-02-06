@@ -5,6 +5,5 @@ pandas
 scikit-learn
 matplotlib
 seaborn
-csv
-yaml
-time
+pyYAML
+torchmetrics

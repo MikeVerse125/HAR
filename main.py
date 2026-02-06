@@ -65,16 +65,22 @@ def main():
         finetune = config["model"]["params"]["finetune"]
 
         # Log file
-        log_file = "logs/" + (config["model"]["type"] + "_history.csv" if finetune 
+        log_file = "logs/" + (config["model"]["type"] + "_history.csv" if not finetune 
                               else "fine_tune_" + config["model"]["type"] + "_history.csv")
         
         # Model name
-        model_name = (config["model"]["type"] if finetune 
+        model_name = (config["model"]["type"] if not finetune 
                       else "fine_tune_" + config["model"]["type"])
         
         # Train the model
         if config["training"]["status"] == True:
-            print("Start training...")   
+            print("Start training...")
+            
+            # Delete existing log file if it exists to start fresh
+            if os.path.exists(log_file):
+                os.remove(log_file)
+                print(f"Existing log file removed: {log_file}")
+            
             train_model = Trainer(model=model, 
                                 dataLoaders=dataset, 
                                 config=config, 
@@ -87,30 +93,64 @@ def main():
         # Plot the history
         if config["plotter"]["status"] == True:
             print("Start plotting...")
-            save_model_path = ("results/ModelsSaved/" + config["model"]["type"]+".pth"if finetune 
-                               else"results/ModelsSaved/" + "fine_tune_" + config["model"]["type"]+".pth")
             
-            metrics = [metric for metric in config["evaluation"]["metrics"]]
-            heads = [head for head in config["evaluation"]["heads"]]
+            # Construct the correct model path (must match what training saved)
+            # Training saves as: best_{model_name}.pth
+            save_model_path = f"results/ModelsSaved/best_{model_name}.pth"
+            
+            # Check if the saved model exists
+            if not os.path.exists(save_model_path):
+                print(f"Warning: Model file not found at {save_model_path}")
+                print("Skipping plotting. Please train the model first.")
+            else:
+                metrics = [metric for metric in config["evaluation"]["metrics"]]
+                heads = [head for head in config["evaluation"]["heads"]]
 
-            model.load_state_dict(torch.load(save_model_path))
-            plotter = TrainingPlotter(log_file=log_file, model_name=model_name)
-            plotter.plot_and_save_metrics(metrics=metrics, heads=heads, save_path="results/metrics")
+                # Load the saved model
+                try:
+                    model.load_state_dict(torch.load(save_model_path, map_location=device))
+                    print(f"Model loaded from: {save_model_path}")
+                    
+                    plotter = TrainingPlotter(log_file=log_file, model_name=model_name)
+                    plotter.plot_and_save_metrics(metrics=metrics, heads=heads, save_path="results/metrics")
+                except Exception as e:
+                    print(f"Error loading model: {e}")
+                    print("Skipping plotting.")
 
         # Evaluate the model
         if config["evaluation"]["status"] == True:
             print("Start Evaluating...")
-            evaluator = TestEvaluator(
-                model=model,                                    # Your trained model
-                data_loader=dataset,                            # Test DataLoader
-                device=device,
-                class_names=data_loaders.dataset.class_mapping, # Map class indices to class names
-                log_dir="results/predictions"                   # Directory to save heatmap images
-            )
-            results = evaluator.evaluate()
-            picture_name = ("final_" + config["model"]["type"] + "_heatmap.png" if finetune 
-                            else "final_" + "fine_tune_" + config["model"]["type"] + "_heatmap.png")
-            evaluator.plot_combined_heatmap(results, picture_name=picture_name)
+            
+            # Construct the correct model path (must match what training saved)
+            save_model_path = f"results/ModelsSaved/best_{model_name}.pth"
+            
+            # Check if the saved model exists
+            if not os.path.exists(save_model_path):
+                print(f"Warning: Model file not found at {save_model_path}")
+                print("Skipping evaluation. Please train the model first.")
+            else:
+                # Get class mapping from the underlying dataset (through TransformSubset)
+                class_mapping = data_loaders.train_dataset.subset.dataset.class_mapping
+                
+                # Load the saved model
+                try:
+                    model.load_state_dict(torch.load(save_model_path, map_location=device))
+                    print(f"Model loaded from: {save_model_path}")
+                    
+                    evaluator = TestEvaluator(
+                        model=model,                                    # Your trained model
+                        data_loader=dataset,                            # Test DataLoader
+                        device=device,
+                        class_names=class_mapping,                      # Map class indices to class names
+                        log_dir="results/predictions"                   # Directory to save heatmap images
+                    )
+                    results = evaluator.evaluate()
+                    picture_name = ("final_" + config["model"]["type"] + "_heatmap.png" if not finetune 
+                                    else "final_" + "fine_tune_" + config["model"]["type"] + "_heatmap.png")
+                    evaluator.plot_combined_heatmap(results, picture_name=picture_name)
+                except Exception as e:
+                    print(f"Error during evaluation: {e}")
+                    print("Skipping evaluation.")
         
 
     except ValueError as e:

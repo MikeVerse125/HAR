@@ -21,15 +21,47 @@ class Trainer:
         self.criterion_classification = torch.nn.CrossEntropyLoss()
         self.criterion_binary = torch.nn.BCEWithLogitsLoss()
 
+        # Learning rate scheduler (optional)
+        self.use_scheduler = self.config["training"].get("use_scheduler", False)
+        if self.use_scheduler:
+            scheduler_config = self.config["training"].get("scheduler", {})
+            scheduler_type = scheduler_config.get("type", "ReduceLROnPlateau")
+            
+            if scheduler_type == "ReduceLROnPlateau":
+                self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                    self.optimizer,
+                    mode=scheduler_config.get("mode", "min"),
+                    factor=scheduler_config.get("factor", 0.5),
+                    patience=scheduler_config.get("patience", 3)
+                )
+            elif scheduler_type == "CosineAnnealingLR":
+                self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    self.optimizer,
+                    T_max=scheduler_config.get("T_max", self.config["training"]["epochs"]),
+                    eta_min=scheduler_config.get("eta_min", 1e-6)
+                )
+            elif scheduler_type == "StepLR":
+                self.scheduler = torch.optim.lr_scheduler.StepLR(
+                    self.optimizer,
+                    step_size=scheduler_config.get("step_size", 10),
+                    gamma=scheduler_config.get("gamma", 0.1)
+                )
+            else:
+                self.scheduler = None
+                print(f"Warning: Unknown scheduler type '{scheduler_type}'. No scheduler will be used.")
+        else:
+            self.scheduler = None
+
         # Task-specific loss weights
-        self.classification_weight = self.config.get("classification_weight", 1.0)
-        self.binary_weight = self.config.get("binary_weight", 1.0)
+        self.classification_weight = self.config["training"].get("classification_weight", 1.0)
+        self.binary_weight = self.config["training"].get("binary_weight", 1.0)
 
         # Logs
         self.log_file = log_file
 
-        # Initialize the history for storing metrics
-        self.history = {"epoch": []}
+        # Initialize the history for storing metrics (optional, only if needed for in-memory analysis)
+        self.track_history = self.config["training"].get("track_history", False)
+        self.history = {"epoch": []} if self.track_history else None
 
         # Create log file if it does not exist
         if not os.path.exists(self.log_file):
@@ -86,7 +118,7 @@ class Trainer:
             total_binary_loss += binary_loss.item()
 
             class_preds = torch.argmax(class_logits, dim=1)
-            binary_preds = torch.sigmoid(binary_logits).round()
+            binary_preds = torch.sigmoid(binary_logits).round().int()
             self.metrics.update(class_preds, class_labels, binary_preds, binary_labels)
 
         # Compute average losses and metrics
@@ -129,14 +161,14 @@ class Trainer:
                 
                 # Compute the loss
                 classification_loss = self.criterion_classification(class_logits, class_labels)
-                binary_loss = self.criterion_binary(binary_logits, binary_labels.float())
+                binary_loss = self.criterion_binary(binary_logits, binary_labels)
 
                 # Accumulate losses and update metrics
                 total_classification_loss += classification_loss.item()
                 total_binary_loss += binary_loss.item()
 
                 class_preds = torch.argmax(class_logits, dim=1)
-                binary_preds = torch.sigmoid(binary_logits).round()
+                binary_preds = torch.sigmoid(binary_logits).round().int()
                 self.metrics.update(class_preds, class_labels, binary_preds, binary_labels)
 
         # Compute average losses and metrics
@@ -161,10 +193,20 @@ class Trainer:
     def fit(self):
         """
         Train and evaluate the model with early stopping.
-        Save the model in two cases:
-        1. After 5 patience epochs without improvement.
-        2. At the end of training if early stopping is not triggered.
+        The best model (lowest validation loss) is always saved and clearly labeled.
         """
+        # Validate dataloaders
+        if len(self.dataloaders["train"]) == 0:
+            raise ValueError("Training dataloader is empty. Cannot proceed with training.")
+        if len(self.dataloaders["val"]) == 0:
+            raise ValueError("Validation dataloader is empty. Cannot proceed with training.")
+        
+        # Verify GPU usage
+        print(f"Training on device: {self.device}")
+        if self.device.type == "cuda":
+            print(f"GPU: {torch.cuda.get_device_name(0)}")
+            print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+        
         total_epochs = self.config["training"]["epochs"]
         early_stopping = self.config["training"]["early_stopping"]
         patience = self.config["training"]["patience"]
@@ -172,7 +214,6 @@ class Trainer:
         best_metric = float("inf")  # Assuming we are minimizing validation loss
         patience_counter = 0
         best_epoch = -1
-        model_saved = False  # Track if the model has been saved
 
         for epoch in range(total_epochs):
             start_time = time.time()  # Record start time for the epoch
@@ -184,33 +225,38 @@ class Trainer:
             # Track the evaluation loss (or other monitored metric)
             eval_loss = eval_metrics["classification_loss"] + eval_metrics["binary_loss"]
 
+            # Update learning rate scheduler
+            if self.use_scheduler and self.scheduler is not None:
+                if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                    self.scheduler.step(eval_loss)
+                else:
+                    self.scheduler.step()
+
             # Update best metric and reset patience counter
             if eval_loss < best_metric:
                 best_metric = eval_loss
                 patience_counter = 0
                 best_epoch = epoch + 1
 
-                # Save the best model
+                # Save the best model with clear naming
                 if self.config["training"]["save_model"]:
-                    self.__save_model(model_name=self.model_name)
-                    model_saved = True
-                    print(f"Best model saved at epoch {epoch + 1}.")
+                    best_model_name = f"best_{self.model_name}"
+                    self.__save_model(model_name=best_model_name)
+                    print(f"Best model saved at epoch {epoch + 1} with validation loss: {eval_loss:.4f}")
             else:
                 patience_counter += 1
 
-                # Save the model after 5 patience epochs if it's not improving
-                if patience_counter == patience and self.config["training"]["save_model"]:
-                    model_name = f"model_after_{patience}_patience_epochs.pth"
-                    self.__save_model(model_name=model_name)
-                    model_saved = True
-                    print(f"Model saved after {patience} patience epochs at epoch {epoch + 1}.")
-
-            # Log metrics to history
-            self.history["epoch"].append(epoch + 1)
-            for key, value in train_metrics.items():
-                self.history[f"train_{key}"] = self.history.get(f"train_{key}", []) + [value]
-            for key, value in eval_metrics.items():
-                self.history[f"eval_{key}"] = self.history.get(f"eval_{key}", []) + [value]
+            # Log metrics to history (only if tracking is enabled)
+            if self.track_history:
+                self.history["epoch"].append(epoch + 1)
+                for key, value in train_metrics.items():
+                    if f"train_{key}" not in self.history:
+                        self.history[f"train_{key}"] = []
+                    self.history[f"train_{key}"].append(value)
+                for key, value in eval_metrics.items():
+                    if f"eval_{key}" not in self.history:
+                        self.history[f"eval_{key}"] = []
+                    self.history[f"eval_{key}"].append(value)
 
             # Write metrics to CSV
             with open(self.log_file, mode="a", newline="") as file:
@@ -222,10 +268,12 @@ class Trainer:
             estimated_time_remaining = epoch_time * (total_epochs - epoch - 1)
 
             # Print metrics
+            current_lr = self.optimizer.param_groups[0]['lr']
             print(f"[Epoch {epoch + 1}/{total_epochs}]-------------------------------------------------------------")
             print(f"Train: {train_metrics}")
             print(f"Eval: {eval_metrics}")
             print(f"Eval Loss: {eval_loss:.4f}, Best Eval Loss: {best_metric:.4f}, Patience Counter: {patience_counter}")
+            print(f"Learning Rate: {current_lr:.2e}")
             print(f"Epoch Time: {epoch_time:.2f}s, Estimated Time Remaining: {estimated_time_remaining / 60:.2f} minutes")
 
             # Early stopping
@@ -233,12 +281,13 @@ class Trainer:
                 print(f"Early stopping triggered at epoch {epoch + 1}. Best model was at epoch {best_epoch}.")
                 break
 
-        # Save the model at the end of training if it hasn't already been saved
-        if not model_saved and self.config["training"]["save_model"]:
-            self.__save_model(model_name="final_" + self.model_name + ".pth")
-            print("Final model saved at the end of training.")
-
         print("---------------------Training Complete---------------------")
+        if best_epoch > 0:
+            print(f"Best model achieved at epoch {best_epoch} with validation loss: {best_metric:.4f}")
+            if self.config["training"]["save_model"]:
+                print(f"Best model saved as: best_{self.model_name}")
+        else:
+            print("Warning: No improvement was observed during training.")
 
 
     def __save_model(self, model_name="model.pth", save_dir="results/ModelsSaved"):

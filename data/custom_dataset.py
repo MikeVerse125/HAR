@@ -14,7 +14,6 @@ class CustomDataset(Dataset):
         self.class_mapping = {class_name: idx for idx, class_name in enumerate(self.data["Class"].unique())}
         self.reverse_class_mapping = {idx: class_name for class_name, idx in self.class_mapping.items()}
         
-        
     
     def __len__(self):
         return len(self.data)
