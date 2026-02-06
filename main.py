@@ -47,6 +47,24 @@ def main():
 
         model.to(device)
 
+        # Finetune
+        finetune = config["model"]["params"]["finetune"]
+
+        # Load pretrained model if fine-tuning
+        if finetune:
+            pretrained_path = config["model"].get("pretrained_model_path", f"results/ModelsSaved/best_{config['model']['type']}.pth")
+            if os.path.exists(pretrained_path):
+                try:
+                    model.load_state_dict(torch.load(pretrained_path, map_location=device))
+                    print(f"Loaded pretrained model from: {pretrained_path}")
+                    print("Continuing training with all layers unfrozen for fine-tuning")
+                except Exception as e:
+                    print(f"Warning: Failed to load pretrained model: {e}")
+                    print("Starting fine-tuning from ImageNet weights (not recommended)")
+            else:
+                print(f"Warning: Pretrained model not found at {pretrained_path}")
+                print("Starting fine-tuning from ImageNet weights (not recommended)")
+
         # Prepare the data
         data_loaders = DataHandler(
             csv_file=config["data"]["csv_file"],
@@ -61,8 +79,6 @@ def main():
         # Initialise the metrics
         metric = Metrics(num_classes=config["data"]["num_classes"], device=device)   
 
-        # Finetune
-        finetune = config["model"]["params"]["finetune"]
 
         # Log file
         log_file = "logs/" + (config["model"]["type"] + "_history.csv" if not finetune 

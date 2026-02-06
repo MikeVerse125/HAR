@@ -37,9 +37,10 @@ model:
   params: 
     reduction_ratio: 16
     kernel_size: 7
-    finetune: false # If true all layer on the pretrain model unfreeze 
+    finetune: true # If true all layer on the pretrain model unfreeze 
     dropout_rate: 0.5
     in_channels: [128, 64, 8]
+  pretrained_model_path: "results/ModelsSaved/best_attention.pth"  # Used when finetune=true
     
 
 evaluation: 
